@@ -77,5 +77,6 @@ module checksum_tb;
 
         $display("Testbench completed.");
         $finish;
+        
     end
 endmodule

@@ -1,3 +1,5 @@
+`timescale 1ns / 100ps
+
 /*
 
 		16-bit source port			16-bit destination port
@@ -26,50 +28,35 @@ reg [63:0] packet = {src_port, dst_port, length, checksum};
 */
 
 
-`timescale 1ns / 100ps
-
 module PacketProcessor_tb;
     // --------------------------------------------------------------------
     // Parameters & signals
     // --------------------------------------------------------------------
     localparam CLK_PERIOD      = 10;
     localparam DATA_WIDTH      = 16;
-    localparam FIFO_DEPTH      = 16;
-    // override UDP_HDR_OFFSET to 0 so header starts immediately
+    localparam FIFO_DEPTH      = 64;
     localparam UDP_HDR_OFFSET  = 0;
 
     reg               clk;
     reg               rst;
-    // serial bit in
     reg               i_udp_data;
-    // tie off unused SPI/int signals
+
     wire              data_out;
     wire              data_out_valid;
     wire              flush_requested;
     wire              eth_available;
 
-    // we'll collect output words here
-    reg [DATA_WIDTH-1:0] out_words [0:3];
-    integer             out_idx;
+    reg [DATA_WIDTH-1:0] out_words [0:15];
+    integer             out_idx, i;
 
-    // --------------------------------------------------------------------
-    // The 4-word “packet”: src=7, dst=2, len=2, checksum=0xA
-    // Negative-zero condition: 5+3+2 + ~A (0xF5) = 0xFFFF
-    // Each 16-bit word will be shifted LSB-first.
-    // --------------------------------------------------------------------
-    
-    parameter [15:0] src_port = 16'b0111; // src port: 7
-    parameter [15:0] dst_port = 16'b0010; // dst port: 2
+    // Packet fields
+    parameter [15:0] src_port = 16'b0111;
+    parameter [15:0] dst_port = 16'b0010;
+    parameter [15:0] length   = 16'b0100;
+    parameter [15:0] checksum = 16'h724D;
 
-    parameter [15:0] length = 16'b0100; // packet length: this packet wont carry data, only header (4 bytes total)
-    parameter [15:0] checksum = 16'h724D; // 7 + 2 + 4 + ~D = FFFF -> -0
-    
-    reg [63:0] packet = {
-        src_port,   // source port
-        dst_port,   // dest port
-        length,   // length
-        checksum    // checksum
-    };
+    // Construct packet header (64 bits total)
+    reg [63:0] packet = {src_port, dst_port, length, checksum};
 
     // --------------------------------------------------------------------
     // DUT instantiation
@@ -100,33 +87,53 @@ module PacketProcessor_tb;
     end
 
     // --------------------------------------------------------------------
-    // Apply reset, then pump bits
+    // Stimulus: reset -> shift in bits -> wait for processing
     // --------------------------------------------------------------------
     integer word, bit;
     initial begin
-        // initialize
         rst = 1;
         i_udp_data = 0;
         out_idx = 0;
         #(CLK_PERIOD*3);
 
-        // release reset
         rst = 0;
         #(CLK_PERIOD);
 
-        // feed each 16-bit word LSB-first
+        // Send all bits of the 64-bit packet (LSB first)
         for (word = 0; word < 4; word = word + 1) begin
-            for (bit = 0; bit < DATA_WIDTH; bit = bit + 1) begin
+            for (bit = 0; bit < 16; bit = bit + 1) begin
                 i_udp_data = packet[word*16 + bit];
                 #(CLK_PERIOD);
             end
         end
 
-        // after last bit, give a few cycles for DUT to process
-        #(CLK_PERIOD*10);
+        // Wait for packet processing to complete
+        #(CLK_PERIOD*20);
+        $display("Finished sending packet bits.");
 
-        // done
-        $display("TB completed.");
+        // ---------------------------------------------------------------
+        // Check data_out from W5500 readout interface
+        // ---------------------------------------------------------------
+        wait (data_out_valid);
+        forever begin
+            if (data_out_valid) begin
+                out_words[out_idx] = data_out;
+                $display("Output word %0d: %b", out_idx, data_out);
+                out_idx = out_idx + 1;
+            end
+            #(CLK_PERIOD);
+            if (out_idx == 4) begin
+                $display("All output words captured.");
+            end
+        end
+
+        // Final display
+        $display("===== Final Output Words =====");
+                
+        for (i = 0; i < out_idx; i = i + 1) begin
+            $display("Word[%0d] = 0x%h", i, out_words[i]);
+        end
+
         $finish;
     end
 
