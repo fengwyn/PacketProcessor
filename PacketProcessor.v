@@ -44,8 +44,8 @@ module PacketProcessor #(
     parameter DATA_WIDTH    = 16,   // 16-bit width
     parameter FIFO_DEPTH    = 4096, // 4096-bit depth, a total of 16 * 4096 = 65536 total bits
     // Ethernet(14) + IPv4 header (assumed fixed 20) = byte offset where UDP header starts
-    parameter UDP_HDR_OFFSET    = 14 + 20
-
+    //parameter UDP_HDR_OFFSET    = 14 + 20
+    parameter UDP_HDR_OFFSET = 0   // Since we're now formatting the UDP into bytes, we'll know the chekcsum offset (4th in buffer)
 )(
 
     // FPGA Clock and Reset
