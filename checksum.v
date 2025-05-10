@@ -4,7 +4,7 @@
 // This module verifies the UDP checksum by:
 // 1. Receiving 16-bit buffer containing 4 bytes
 // 2. Extracting and summing the 4 bytes
-// 3. Verifying if the result equals 0 (valid checksum)
+// 3. Verifying if the result equals FFFF (-0) (valid checksum)
 
 module checksum #(
     parameter WORD_COUNT = 0    // This can be useful if we know how many words will be input
@@ -45,7 +45,7 @@ module checksum #(
             // Sum all bytes
             checksum_sum <= byte1 + byte2 + byte3 + byte4;
             // Check if sum equals to negative 0 (valid checksum  0xFF FF FF FF)
-            o_checksum_valid <= ((byte1 + byte2 + byte3 + ~byte4) == 8'hFF);
+            o_checksum_valid <= ((byte1 + byte2 + byte3 + ~byte4));
 
         end
     end
