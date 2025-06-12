@@ -44,8 +44,7 @@ module PacketProcessor #(
     parameter DATA_WIDTH    = 16,   // 16-bit width
     parameter FIFO_DEPTH    = 4096, // 4096-bit depth, a total of 16 * 4096 = 65536 total bits
     // Ethernet(14) + IPv4 header (assumed fixed 20) = byte offset where UDP header starts
-    //parameter UDP_HDR_OFFSET    = 14 + 20
-    parameter UDP_HDR_OFFSET = 0   // Since we're now formatting the UDP into bytes, we'll know the chekcsum offset (4th in buffer)
+    parameter HDR_OFFSET = 0   // Since we're now formatting the UDP into bytes, we'll know the chekcsum offset (4th in buffer)
 )(
 
     // FPGA Clock and Reset
@@ -59,7 +58,7 @@ module PacketProcessor #(
     output data_out,
     output data_out_valid,
     output flush_requested,
-    output eth_available,
+    output eth_available,    // output eth_available this signal is controlled internally by the w5500 module itself
 
     // Input from JB
     input i_udp_data
@@ -175,7 +174,7 @@ module PacketProcessor #(
                 // WRITE_FIFO: Now we'll write the assembled byte into FIFO or capture the checksum
                 WRITE_FIFO: begin
 
-                    if (byte_count == (UDP_HDR_OFFSET + 4)) begin  // Reached checksum field
+                    if (byte_count == (HDR_OFFSET + 4)) begin  // Reached checksum field
                         // The UDP offset must be at the buffer index 4 and 5
                         // So we'll we'll read out the currently last buffered FIFO byte as well as the current byte placed in buffer
                         checksum_buffer <= {byte_buffer, fifo_data_out[7:0]};
